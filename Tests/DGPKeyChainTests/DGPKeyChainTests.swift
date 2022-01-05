@@ -59,6 +59,17 @@ class DGPKeyChainManager {
         do {
             _ = try get(key)
             
+            let query = createQuery(key) as CFDictionary
+            
+            var attributedToUpdate = [String: AnyObject]()
+            attributedToUpdate[kSecValueData as String] = data as AnyObject
+            
+            
+            let status = SecItemUpdate(query, attributedToUpdate as CFDictionary)
+            
+            guard status == noErr else {
+                throw DGPKeyChainError.unhandled
+            }
         } catch DGPKeyChainError.itemNotFound {
             var query = createQuery(key)
             query[kSecValueData as String] = data as AnyObject
@@ -95,8 +106,7 @@ final class DGPKeyChainTests: XCTestCase {
     func test_get_withNoExistingValue_throwItemNotFoundError() {
         let sut = makeSUT()
         let key = "someKey2"
-        
-        let value = try? sut.get(key)
+
         XCTAssertThrowsError(try sut.get(key), "", { error in
             XCTAssertEqual(error as! DGPKeyChainError, .itemNotFound)
         })
@@ -111,6 +121,21 @@ final class DGPKeyChainTests: XCTestCase {
         let object = try sut.get(key)
         
         XCTAssertEqual(object, value)
+        
+        try clean(sut: sut, [key])
+    }
+    
+    func test_set_withStringValueExisting_shouldUpdateValue() throws {
+        let sut = makeSUT()
+        let key = "someKey2"
+        let value = "someValue"
+        let anotherValue = "anotherValue"
+        
+        try sut.set(key, withValue: value)
+        try sut.set(key, withValue: anotherValue)
+        let object = try sut.get(key)
+        
+        XCTAssertEqual(object, anotherValue)
         
         try clean(sut: sut, [key])
     }
