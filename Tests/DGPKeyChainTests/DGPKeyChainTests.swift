@@ -12,6 +12,7 @@ protocol DGPKeyChainStore {
 
 enum DGPKeyChainError: Error {
     case itemNotFound
+    case notCodable
     case unhandled
 }
 
@@ -22,7 +23,45 @@ class DGPKeyChainManager {
         self.service = service
     }
     
+    //MARK: - Get
+    
     func get(_ key: String) throws -> String? {
+        guard let data = try getData(key),
+              let value = String(data: data, encoding: .utf8) else {
+                  throw DGPKeyChainError.unhandled
+              }
+        
+        return value
+    }
+    
+    func get<T: Decodable>(_ key: String, withType type: T.Type) throws -> T {
+        guard let data = try getData(key),
+              let value = try? JSONDecoder().decode(type, from: data) else {
+                  throw DGPKeyChainError.unhandled
+              }
+        
+        return value
+    }
+    
+    //MARK: - Set
+    
+    func set(_ key: String, withValue value: String) throws {
+        guard let data = value.data(using: .utf8) else {
+            throw DGPKeyChainError.unhandled
+        }
+        
+        try set(key, data: data)
+    }
+    
+    func set<T: Encodable>(_ key: String, withValue value: T) throws {
+        guard let data = try? JSONEncoder().encode(value) else {
+            throw DGPKeyChainError.notCodable
+        }
+        
+        try set(key, data: data)
+    }
+    
+    private func getData(_ key: String) throws -> Data? {
         var query = createQuery(key)
         
         query[kSecMatchLimit as String] = kSecMatchLimitOne
@@ -43,19 +82,14 @@ class DGPKeyChainManager {
         }
         
         guard let existingItem = queryResult as? [String: AnyObject],
-                let data = existingItem[kSecValueData as String] as? Data,
-              let value = String(data: data, encoding: .utf8) else {
-                  throw DGPKeyChainError.unhandled
+              let data = existingItem[kSecValueData as String] as? Data else {
+                  return nil
               }
         
-        return value
+        return data
     }
     
-    func set(_ key: String, withValue value: String) throws {
-        guard let data = value.data(using: .utf8) else {
-            throw DGPKeyChainError.unhandled
-        }
-        
+    private func set(_ key: String, data: Data) throws {
         do {
             _ = try get(key)
             
@@ -64,25 +98,26 @@ class DGPKeyChainManager {
             var attributedToUpdate = [String: AnyObject]()
             attributedToUpdate[kSecValueData as String] = data as AnyObject
             
-            
             let status = SecItemUpdate(query, attributedToUpdate as CFDictionary)
             
             guard status == noErr else {
                 throw DGPKeyChainError.unhandled
             }
         } catch DGPKeyChainError.itemNotFound {
-            var query = createQuery(key)
-            query[kSecValueData as String] = data as AnyObject
-            
-            let status = SecItemAdd(query as CFDictionary, nil)
-            
-            guard status == noErr else {
-                throw DGPKeyChainError.unhandled
-            }
+            try update(key, data: data)
         }
     }
     
-    
+    private func update(_ key: String, data: Data) throws {
+        var query = createQuery(key)
+        query[kSecValueData as String] = data as AnyObject
+        
+        let status = SecItemAdd(query as CFDictionary, nil)
+        
+        guard status == noErr else {
+            throw DGPKeyChainError.unhandled
+        }
+    }
     
     func delete(_ key: String) throws {
         let query = createQuery(key) as CFDictionary
@@ -125,6 +160,19 @@ final class DGPKeyChainTests: XCTestCase {
         try clean(sut: sut, [key])
     }
     
+    func test_set_withCodableValueNotExisting_shouldSaveValue() throws {
+        let sut = makeSUT()
+        let key = "someKey2"
+        let value: Int = 100
+        
+        try sut.set(key, withValue: value)
+        let object = try sut.get(key, withType: Int.self)
+        
+        XCTAssertEqual(object, value)
+        
+        try clean(sut: sut, [key])
+    }
+    
     func test_set_withStringValueExisting_shouldUpdateValue() throws {
         let sut = makeSUT()
         let key = "someKey2"
@@ -134,6 +182,21 @@ final class DGPKeyChainTests: XCTestCase {
         try sut.set(key, withValue: value)
         try sut.set(key, withValue: anotherValue)
         let object = try sut.get(key)
+        
+        XCTAssertEqual(object, anotherValue)
+        
+        try clean(sut: sut, [key])
+    }
+    
+    func test_set_withCodableValueExisting_shouldUpdateValue() throws {
+        let sut = makeSUT()
+        let key = "someKey2"
+        let value: Int = 100
+        let anotherValue: Int = 101
+        
+        try sut.set(key, withValue: value)
+        try sut.set(key, withValue: anotherValue)
+        let object = try sut.get(key, withType: Int.self)
         
         XCTAssertEqual(object, anotherValue)
         
