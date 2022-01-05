@@ -62,6 +62,10 @@ public final class DGPKeyChainManager: DGPKeyChainStore {
         }
     }
     
+}
+
+extension DGPKeyChainManager {
+    
     private func getData(_ key: String) throws -> Data? {
         var query = createQuery(key)
         
@@ -127,4 +131,5 @@ public final class DGPKeyChainManager: DGPKeyChainStore {
         query[kSecAttrAccount as String] = key as AnyObject
         return query
     }
+    
 }
