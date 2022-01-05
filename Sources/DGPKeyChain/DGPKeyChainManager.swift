@@ -97,19 +97,22 @@ extension DGPKeyChainManager {
     private func set(_ key: String, data: Data) throws {
         do {
             _ = try get(key)
-            
-            let query = createQuery(key) as CFDictionary
-            
-            var attributedToUpdate = [String: AnyObject]()
-            attributedToUpdate[kSecValueData as String] = data as AnyObject
-            
-            let status = SecItemUpdate(query, attributedToUpdate as CFDictionary)
-            
-            guard status == noErr else {
-                throw DGPKeyChainError.unhandled
-            }
+            try create(key, data: data)
         } catch DGPKeyChainError.itemNotFound {
             try update(key, data: data)
+        }
+    }
+    
+    private func create(_ key: String, data: Data) throws {
+        let query = createQuery(key) as CFDictionary
+        
+        var attributedToUpdate = [String: AnyObject]()
+        attributedToUpdate[kSecValueData as String] = data as AnyObject
+        
+        let status = SecItemUpdate(query, attributedToUpdate as CFDictionary)
+        
+        guard status == noErr else {
+            throw DGPKeyChainError.unhandled
         }
     }
     
