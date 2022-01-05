@@ -1,22 +1,21 @@
 import XCTest
 @testable import DGPKeyChain
 
-struct DGPKeyChainResult {
-    let status: OSStatus
-    let queryResult: AnyObject?
-    
-}
-protocol DGPKeyChainStore {
-    func get(_ query: [String: AnyObject]) -> DGPKeyChainResult
-}
-
 enum DGPKeyChainError: Error {
     case itemNotFound
     case notCodable
     case unhandled
 }
 
-class DGPKeyChainManager {
+protocol DGPKeyChainStore {
+    func get(_ key: String) throws -> String?
+    func get<T: Decodable>(_ key: String, withType type: T.Type) throws -> T
+    func set(_ key: String, withValue value: String) throws
+    func set<T: Encodable>(_ key: String, withValue value: T) throws
+    func delete(_ key: String) throws
+}
+
+class DGPKeyChainManager: DGPKeyChainStore {
     let service: String
     
     init(service: String) {
@@ -59,6 +58,16 @@ class DGPKeyChainManager {
         }
         
         try set(key, data: data)
+    }
+    
+    //MARK: - Delete
+    
+    func delete(_ key: String) throws {
+        let query = createQuery(key) as CFDictionary
+        let status = SecItemDelete(query)
+        guard status == noErr  || status == errSecItemNotFound else {
+            throw DGPKeyChainError.unhandled
+        }
     }
     
     private func getData(_ key: String) throws -> Data? {
@@ -115,14 +124,6 @@ class DGPKeyChainManager {
         let status = SecItemAdd(query as CFDictionary, nil)
         
         guard status == noErr else {
-            throw DGPKeyChainError.unhandled
-        }
-    }
-    
-    func delete(_ key: String) throws {
-        let query = createQuery(key) as CFDictionary
-        let status = SecItemDelete(query)
-        guard status == noErr  || status == errSecItemNotFound else {
             throw DGPKeyChainError.unhandled
         }
     }
@@ -218,13 +219,13 @@ final class DGPKeyChainTests: XCTestCase {
     
     //MARK: - Helpers
     
-    private func makeSUT() -> DGPKeyChainManager {
+    private func makeSUT() -> DGPKeyChainStore {
         let service = "some.service"
         let manager = DGPKeyChainManager(service: service)
         return manager
     }
     
-    private func clean(sut: DGPKeyChainManager, _ keys: [String]) throws {
+    private func clean(sut: DGPKeyChainStore, _ keys: [String]) throws {
         try keys.forEach {
             try sut.delete($0)
         }
