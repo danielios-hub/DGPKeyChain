@@ -1,3 +1,3 @@
 # DGPKeyChain
 
-A description of this package.
+KeyChain Wrapper for CRUD operation on Codable data
