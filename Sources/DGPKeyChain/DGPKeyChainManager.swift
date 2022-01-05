@@ -38,7 +38,7 @@ public final class DGPKeyChainManager: DGPKeyChainStore {
     
     public func set(_ key: String, withValue value: String) throws {
         guard let data = value.data(using: .utf8) else {
-            throw DGPKeyChainError.unhandled
+            throw DGPKeyChainError.notCodable
         }
         
         try set(key, data: data)
