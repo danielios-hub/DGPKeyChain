@@ -1,3 +1,3 @@
 # DGPKeyChain
 
-KeyChain Wrapper for CRUD operation on Codable data
+KeyChain Wrapper for CRUD operations on Codable data
