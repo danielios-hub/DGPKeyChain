@@ -25,6 +25,10 @@ final class DGPKeyChainTests: XCTestCase {
         XCTAssert(storeSpy.messages.isEmpty)
     }
     
+    func test_get_withNoValue_returnNil() {
+        
+    }
+    
     private class KeyChainStoreSpy: DGPKeyChainStore {
         enum Message {
             
